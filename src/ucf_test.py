@@ -7,14 +7,13 @@ from torch.utils.data import DataLoader
 import numpy as np
 from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.metrics import auc, roc_curve, confusion_matrix, precision_recall_curve
-from model import CLIPVAD
+from model import SemVAD
 from utils.dataset import UCFDataset
 from utils.tools import get_batch_mask, get_prompt_text
 from utils.ucf_detectionMAP import getDetectionMAP as dmAP
 import ucf_option
 import math
 import matplotlib.pyplot as plt
-from new_transformer_arch import  AttentionAcrossFrames
 import matplotlib.cm as cm
 
 
@@ -109,11 +108,8 @@ def fixed_smooth(logits, t_size):
 
     return ins_preds
 def test(model,testdataloader, maxlen, prompt_text, gt, gtsegments, gtlabels, device):
-    file_path = 'UCFCrime_BoundingBox_Annotation-master/Test_annotation.pkl'
     with open("ucf_clip_labels.pkl", "rb") as f:
         loaded_data = pickle.load(f)
-    with open(file_path, 'rb') as file:
-        annotation_data = pickle.load(file)
     model.to(device)
     model.eval()
     element_logits2_stack = []
@@ -182,45 +178,6 @@ def test(model,testdataloader, maxlen, prompt_text, gt, gtsegments, gtlabels, de
             element_logits2 = np.repeat(element_logits2, 16, 0)
             element_logits2_stack.append(element_logits2)
 
-    '''plt.rcParams.update({
-        'font.size': 14,  # Base font size
-        'axes.titlesize': 18,  # Title font size
-        'axes.labelsize': 16,  # X and Y label font size
-        'xtick.labelsize': 12,  # X tick font size
-        'ytick.labelsize': 12,  # Y tick font size
-        'legend.fontsize': 12,  # Legend font size
-        'legend.title_fontsize': 14  # Legend title font size
-    })
-    for l,logit in enumerate(element_logits2_stack):
-        vid = videos[l].split("_")[0]
-        anomaly_classes = np.argmax(logit, axis=1)
-        scores = ap3[l]
-        # Define a colormap for classes (0-13)
-        distinct_colors = [
-            "#E6194B", "#3CB44B", "#FFE119", "#0082C8", "#F58231", "#911EB4", "#46F0F0",
-            "#F032E6", "#D2F53C", "#FABEBE", "#008080", "#E6BEFF", "#AA6E28", "#800000"
-        ]
-
-        # Assign colors to each anomaly class
-        colors = [distinct_colors[cls] for cls in anomaly_classes] # Assign color to each segment
-
-        # Plot
-        plt.figure(figsize=(10, 5))
-        plt.bar(range(scores.shape[0]), scores.flatten(), color=colors, edgecolor=None)
-
-        # Labels and legend
-        plt.xlabel("Segment Index")
-        plt.ylabel("Anomaly Score")
-        plt.title(vid)
-        # Create a legend mapping colors to anomaly classes
-        handles = [plt.Rectangle((0, 0), 1, 1, color=distinct_colors[i]) for i in range(14)]
-        plt.legend(handles, [f"{prompt_text[i]}" for i in range(14)], title="Anomaly Class", bbox_to_anchor=(1.05, 1),
-                   loc='upper left')
-
-        # Save the figure
-        plt.savefig("plots/"+vid+".png", dpi=300, bbox_inches='tight')
-        plt.close()#'''
-
     ap1 = ap1.cpu().numpy()
     ap2 = ap2.cpu().numpy()
     ap1 = ap1.tolist()
@@ -231,10 +188,8 @@ def test(model,testdataloader, maxlen, prompt_text, gt, gtsegments, gtlabels, de
     ROC2 = roc_auc_score(gt, np.repeat(ap2, 16))
     AP2 = average_precision_score(gt, np.repeat(ap2, 16))
     pre, rec, _ = precision_recall_curve(gt, np.repeat(ap1, 16))
-    pr_auc = auc(rec, pre)
     print("AUC1: ", ROC1, " AP1: ", AP1)
     print("AUC2: ", ROC2, " AP2:", AP2)
-    #print("beta: ", model.beta.item())
     dmap, iou = dmAP(element_logits2_stack, gtsegments, gtlabels, excludeNormal=False)
     averageMAP = 0
     for i in range(5):
@@ -242,7 +197,6 @@ def test(model,testdataloader, maxlen, prompt_text, gt, gtsegments, gtlabels, de
         averageMAP += dmap[i]
     averageMAP = averageMAP/(i+1)
     print('average MAP: {:.2f}'.format(averageMAP))
-    #print("TioU: ", sum(inter_union) / len(inter_union))'''
     return ROC1, AP1,averageMAP,dmap,ROC2
 
 
@@ -259,7 +213,7 @@ if __name__ == '__main__':
     gt = np.load(args.gt_path)
     gtsegments = np.load(args.gt_segment_path, allow_pickle=True)
     gtlabels = np.load(args.gt_label_path, allow_pickle=True)
-    model = CLIPVAD(args.classes_num, args.embed_dim, args.visual_length, args.visual_width, args.visual_head, args.visual_layers, args.attn_window, args.prompt_prefix, args.prompt_postfix, device)
+    model = SemVAD(args.classes_num, args.embed_dim, args.visual_length, args.visual_width, args.visual_head, args.visual_layers, args.attn_window, args.prompt_prefix, args.prompt_postfix, device)
     model_param = torch.load(args.model_path)
     model.load_state_dict(model_param)
     patch_model = AttentionAcrossFrames(in_channels=512, grid_size=(7, 7)).to(device="cuda:0")

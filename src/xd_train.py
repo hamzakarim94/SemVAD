@@ -186,7 +186,7 @@ def setup_seed(seed):
 if __name__ == '__main__':
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     args = xd_option.parser.parse_args()
-    seeds = [1, 256, 512, 7, 72, 34, 100]  # 9,234,42,1,256,
+    seeds = [9,234,42,1, 256, 512, 7, 72, 34, 100]
     results = []
     for seed in seeds:
         args.seed = seed
@@ -216,7 +216,7 @@ if __name__ == '__main__':
         gtsegments = np.load(args.gt_segment_path, allow_pickle=True)
         gtlabels = np.load(args.gt_label_path, allow_pickle=True)
 
-        model = CLIPVAD(args.classes_num, args.embed_dim, args.visual_length, args.visual_width, args.visual_head,
+        model = SemVAD(args.classes_num, args.embed_dim, args.visual_length, args.visual_width, args.visual_head,
                         args.visual_layers, args.attn_window, args.prompt_prefix, args.prompt_postfix, device)
         model_param = torch.load(args.model_path)
         model.load_state_dict(model_param)
@@ -226,4 +226,4 @@ if __name__ == '__main__':
         AUC = max(ROC1,ROC2)
         results.append([AUC, AP, averageMAP, dmap[0], dmap[1], dmap[2], dmap[3], dmap[4], seed])
         df = pd.DataFrame(results)
-        df.to_csv("results_fuse_XD.csv", header=None, index=False)
+        df.to_csv("XD.csv", header=None, index=False)

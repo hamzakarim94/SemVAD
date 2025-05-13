@@ -7,8 +7,7 @@ import numpy as np
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
-from new_transformer_arch import  AttentionAcrossFrames
-from model import CLIPVAD
+from src.model import SemVAD
 from ucf_test import test
 from utils.dataset import UCFDataset
 from utils.tools import get_prompt_text, get_batch_label
@@ -290,7 +289,7 @@ if __name__ == '__main__':
         test_dataset = UCFDataset(args.visual_length, args.test_list, True, label_map)
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
         setup_seed(args.seed)
-        model = CLIPVAD(args.classes_num, args.embed_dim, args.visual_length, args.visual_width, args.visual_head, args.visual_layers, args.attn_window, args.prompt_prefix, args.prompt_postfix, device)
+        model = SemVAD(args.classes_num, args.embed_dim, args.visual_length, args.visual_width, args.visual_head, args.visual_layers, args.attn_window, args.prompt_prefix, args.prompt_postfix, device)
         label_map_t = dict({'Normal': 'Normal', 'Abuse': 'Abuse', 'Arrest': 'Arrest', 'Arson': 'Arson', 'Assault': 'Assault', 'Burglary': 'Burglary', 'Explosion': 'Explosion', 'Fighting': 'Fighting', 'RoadAccidents': 'RoadAccidents', 'Robbery': 'Robbery', 'Shooting': 'Shooting', 'Shoplifting': 'Shoplifting', 'Stealing': 'Stealing', 'Vandalism': 'Vandalism'})
 
         #setup_seed(9)
