@@ -275,7 +275,7 @@ if __name__ == '__main__':
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     args = ucf_option.parser.parse_args()
 
-    seeds = [12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30]#9,234,42,1,256,#9,234,42,1,256,512,7,72,34,100
+    seeds = [9,234,42,1,256,512,7,72,34,100]#
     results = []
     for seed in seeds:
         args.seed = seed
@@ -316,4 +316,4 @@ if __name__ == '__main__':
         AUC = max(AUC,AUC2)
         results.append([AUC,AP,AvgMap,dmap[0],dmap[1],dmap[2],dmap[3],dmap[4],seed])
         df = pd.DataFrame(results)
-        df.to_csv("seed_opt2.csv",header=None,index=False)
+        df.to_csv("ucf.csv",header=None,index=False)
