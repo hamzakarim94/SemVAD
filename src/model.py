@@ -19,33 +19,7 @@ class QuickGELU(nn.Module):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
 
-class MLPMixerLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=1024):
-        super(MLPMixerLayer, self).__init__()
-        # MLP applied along the feature dimension
-        self.mlp1 = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, output_dim)
-        )
-        self.layernorm = nn.LayerNorm(output_dim)
-        # MLP applied along the token dimension
-        self.mlp2 = nn.Sequential(
-            nn.Linear(256, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, 256)
-        )
 
-    def forward(self, x):
-        # Channel MLP: (10, 256, 1280) -> (10, 256, D)
-        x = self.mlp1(x)
-        x = self.layernorm(x)
-        # Token MLP: (10, 256, D) -> (10, 256, D)
-        x = x.transpose(1, 2)  # (10, D, 256)
-        x = self.mlp2(x)       # (10, D, 256)
-        x = x.transpose(1, 2)  # (10, 256, D)
-
-        return x
 class ConvMixer(nn.Module):
     def __init__(self):
         super(ConvMixer, self).__init__()
@@ -103,7 +77,7 @@ class Transformer(nn.Module):
         return self.resblocks(x)
 
 
-class CLIPVAD(nn.Module):
+class SemVAD(nn.Module):
     def __init__(self,
                  num_class: int,
                  embed_dim: int,
@@ -161,33 +135,16 @@ class CLIPVAD(nn.Module):
 
         self.frame_position_embeddings = nn.Embedding(visual_length, visual_width)
         self.text_prompt_embeddings = nn.Embedding(77, self.embed_dim)
-        #self.query = nn.Linear(512, 512)
-        #self.key = nn.Linear(768, 512)
-        #self.proj_K = nn.Linear(768, 512)
         self.proj_V = nn.Linear(768, 512)
         self.ptoj_v = nn.Linear(512, 512)
         self.proj2= nn.Linear(512, 512+512)
-        #self.Q = nn.Linear(512*2, 512 * 2)
-        #self.K = nn.Linear(512*2, 512 * 2)
-        #self.V = nn.Linear(512*2, 512 * 2)
-        #self.alpha = nn.Parameter(torch.tensor(1.0))
         self.mlp_mixer = ConvMixer()
-        #self.query_linear = torch.nn.Linear(512, 1280)  # Map tensor1 to Queries (Q) of dimension 512
-        #self.key_linear = torch.nn.Linear(768, 1280)
         self.fc1 = torch.nn.Linear(512, 256)
         self.fc2 = torch.nn.Linear(256, 512)
-        #self.fc3 = torch.nn.Linear(1024, 512)
-        #self.fc4 = torch.nn.Linear(512, 1024)
         self.act = torch.nn.ReLU()
         self.layer_norm = nn.LayerNorm(512)
-
-        #self.layer_norm2 = nn.LayerNorm(1024)
-        #self.sig = torch.nn.Sigmoid()
-        #self.mixer = MLPMixerLayer(input_dim=1280, output_dim=1280)
         self.initialize_parameters()
-        #self.beta = nn.Parameter(torch.tensor(1.0))
-        #self.initialize_weights()
-            #self.proj = nn.Linear(768, 512)
+  
 
     def initialize_weights(self):
         for m in self.modules():
@@ -274,21 +231,13 @@ class CLIPVAD(nn.Module):
             text_tokens[i, self.prompt_prefix + ind + self.prompt_postfix] = word_tokens[i, ind]
 
         text_features = self.clipmodel.encode_text(text_embeddings, text_tokens)
-        #text_features = self.proj(text_features)
+
         return text_features
 
     def forward(self, visual, padding_mask, text, lengths,T_feats,label_clip_feats):
 
         T_feats = self.proj_V(T_feats)
-
-        #value = T_feats
         visual = self.ptoj_v(visual)
-        #query = self.query(visual)
-
-        #query = query / query.norm(dim=1, keepdim=True)
-        #key = key / key.norm(dim=1, keepdim=True)
-        #value = value / value.norm(dim=1, keepdim=True)
-
 
 
         attention_weights = F.softmax(torch.matmul((visual).transpose(-1, -2), (T_feats)) / (256 ** 0.5), dim=-1)
@@ -298,34 +247,18 @@ class CLIPVAD(nn.Module):
         t_feat_attnx = self.fc2(t_feat_attnx)
         t_feat_attn = self.layer_norm(t_feat_attn+t_feat_attnx)
 
-        #visual_features = gate * visual_features + (1 - gate) * value/value.norm(dim=1, keepdim=True)
-        #beta = torch.sigmoid(self.beta)
 
-        visual_text = torch.stack([visual,t_feat_attn],dim=2)#visual_features + self.beta*t_feat_attn
+        visual_text = torch.stack([visual,t_feat_attn],dim=2)
         visual_text = self.mlp_mixer(visual_text)
         visual = torch.concatenate([visual,visual_text],dim=2)#'''
 
-        '''Q = self.Q(visual)
-        K = self.K(visual)
-        V = self.V(visual)
-        attention_weights = F.softmax(torch.matmul((Q), (K).transpose(-1, -2)) / (512 ** 0.5), dim=-1)
-        global_attn = attention_weights @ ((V))
-        global_attn = self.layer_norm2(visual + global_attn)
-        global_attnx = self.act(self.fc3(global_attn))
-        global_attnx = self.fc4(global_attnx)
-        visual_features = global_attn + global_attnx#'''
 
-        #visual = torch.concatenate([visual, t_feat_attn], dim=2)
-        #if label_clip_feats is not None:
         label_clip_feats = self.proj_V(label_clip_feats)
         visual_features = self.encode_video(visual, padding_mask, lengths)
         logits1 = self.classifier(visual_features+self.mlp2(visual_features))
 
 
-        #visual_features = self.proj(visual_features)
-
-        text_features_ori = self.proj2(self.encode_textprompt(text))#self.encode_textprompt(text)#self.proj2(self.encode_textprompt(text))
-        #logits2 = self.classifier_M(visual_features+self.mlp1(visual_features))
+        text_features_ori = self.proj2(self.encode_textprompt(text))
         text_features = text_features_ori
         logits_attn = logits1.permute(0, 2, 1)
         visual_attn = logits_attn @ visual_features
