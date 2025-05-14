@@ -13,8 +13,6 @@ from utils.tools import get_batch_mask, get_prompt_text
 from utils.ucf_detectionMAP import getDetectionMAP as dmAP
 import ucf_option
 import math
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
 
 def process_array(array):
